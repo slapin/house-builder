@@ -1,0 +1,26 @@
+[gd_resource type="Resource" load_steps=12 format=2]
+
+[ext_resource path="res://exterior_set.gd" type="Script" id=1]
+[ext_resource path="res://scenes/external_outer_angle.mesh" type="ArrayMesh" id=2]
+[ext_resource path="res://scenes/external_wall_half.mesh" type="ArrayMesh" id=3]
+[ext_resource path="res://scenes/external_window.mesh" type="ArrayMesh" id=4]
+[ext_resource path="res://scenes/external_doorway.mesh" type="ArrayMesh" id=5]
+[ext_resource path="res://scenes/external_wall.mesh" type="ArrayMesh" id=6]
+[ext_resource path="res://scenes/roof_item_small.mesh" type="ArrayMesh" id=7]
+[ext_resource path="res://scenes/roof_side_right.mesh" type="ArrayMesh" id=8]
+[ext_resource path="res://scenes/roof_side_lright_block.mesh" type="ArrayMesh" id=9]
+[ext_resource path="res://scenes/roof_side_left_block.mesh" type="ArrayMesh" id=10]
+[ext_resource path="res://scenes/roof_side_left.mesh" type="ArrayMesh" id=11]
+
+[resource]
+script = ExtResource( 1 )
+external_wall = ExtResource( 6 )
+external_wall_half = ExtResource( 3 )
+external_doorway = ExtResource( 5 )
+external_window = ExtResource( 4 )
+external_angle = ExtResource( 2 )
+roof_main = ExtResource( 7 )
+roof_side_left = ExtResource( 11 )
+roof_side_right = ExtResource( 8 )
+roof_side_left_block = ExtResource( 10 )
+roof_side_right_block = ExtResource( 9 )

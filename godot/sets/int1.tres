@@ -1,0 +1,20 @@
+[gd_resource type="Resource" load_steps=9 format=2]
+
+[ext_resource path="res://interior_set.gd" type="Script" id=1]
+[ext_resource path="res://scenes/internal_wall_half.mesh" type="ArrayMesh" id=2]
+[ext_resource path="res://scenes/internal_window_frame.mesh" type="ArrayMesh" id=3]
+[ext_resource path="res://scenes/internal_doorframe.mesh" type="ArrayMesh" id=4]
+[ext_resource path="res://scenes/internal_inner_angle.mesh" type="ArrayMesh" id=5]
+[ext_resource path="res://scenes/internal_wall.mesh" type="ArrayMesh" id=6]
+[ext_resource path="res://scenes/ceiling.mesh" type="ArrayMesh" id=7]
+[ext_resource path="res://scenes/floor.mesh" type="ArrayMesh" id=8]
+
+[resource]
+script = ExtResource( 1 )
+wall = ExtResource( 6 )
+wall_half = ExtResource( 2 )
+doorway = ExtResource( 4 )
+window = ExtResource( 3 )
+internal_angle = ExtResource( 5 )
+interior_floor = ExtResource( 8 )
+interior_ceiling = ExtResource( 7 )
