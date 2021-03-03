@@ -1,0 +1,19 @@
+[gd_resource type="Resource" load_steps=4 format=2]
+
+[ext_resource path="res://building_set.gd" type="Script" id=1]
+[ext_resource path="res://sets/int1.tres" type="Resource" id=2]
+[ext_resource path="res://sets/ext1.tres" type="Resource" id=3]
+
+[resource]
+script = ExtResource( 1 )
+house_type = "house4"
+min_wings = 2
+max_wings = 5
+min_wing_size_x = 4
+min_wing_size_z = 4
+max_wing_size_x = 16
+max_wing_size_z = 16
+pwindow = 0.6
+pmidwall = 0.2
+exterior_set = ExtResource( 3 )
+interior_set = ExtResource( 2 )

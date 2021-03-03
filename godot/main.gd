@@ -1,23 +1,55 @@
 extends Spatial
 
-export var exterior_set: Resource
-export var interior_set: Resource
-export var pwindow: float = 0.6
-export var pmidwall: float = 0.2
+export var city_set: Resource
+
 export var roof_enabled = true
 
 var items = {}
 
 onready var queue = [
 	{
-		"name": "house",
+		"name": "city",
 		"data": {
+			"position": Vector3(),
+			"rotation": 0,
+			"set": city_set
 		}
-	}
+	},
 ]
 var delayed_queue = []
 onready var rnd = RandomNumberGenerator.new()
 var saved_seed = 0
+
+func build_city(item):
+	var cset: CitySet = item.data.set
+	var guildhall = {
+		"name": "house",
+		"data": {
+			"position": Vector3(),
+			"rotation": rnd.randf() * PI * 2.0,
+			"bset": cset.guildhall_building_set,
+		}
+	}
+	queue.push_back(guildhall)
+	var circ = cset.radius * PI * 2.0
+	var count = circ / (cset.distance + 4.0)
+	var l = cset.building_sets.size()
+	if l == 0:
+		return
+	for e in range(count):
+		var r = cset.center_radius + rnd.randf() * (cset.radius - cset.center_radius)
+		var x = r * cos(e * cset.distance) + 4.0
+		var y = r * sin(e * cset.distance) + 4.0
+		var rot = rnd.randf() * PI * 2.0
+		var house = {
+			"name": "house",
+			"data": {
+				"position": Vector3(x, 0, y),
+				"rotation": rnd.randf() * PI * 2.0,
+				"bset": cset.building_sets[rnd.randi() % l],
+			}
+		}
+		queue.push_back(house)
 
 func get_next_pos(pos, aabbs, xsize, ysize, nxsize, nysize):
 	var npos = pos
@@ -58,14 +90,11 @@ var proc: Thread
 
 
 func _ready():
-	print(exterior_set.items)
-	for e in exterior_set.items.keys():
-		items[e] = exterior_set.items[e].duplicate()
-	for e in interior_set.items.keys():
-		items[e] = interior_set.items[e].duplicate()
-#	proc = Thread.new()
-#	proc.start(self, "procedural", null)
-	procedural(null)
+	for e in city_set.items.keys():
+		items[e] = city_set.items[e].duplicate()
+	proc = Thread.new()
+	proc.start(self, "procedural", null)
+#	procedural(null)
 
 func can_pass(p1, p2):
 	if abs(p1.x - p2.x) < 0.01 || abs(p1.z - p2.z) < 0.01:
@@ -100,7 +129,6 @@ func build_roof_side(item):
 		xloop = xsize
 		position1 += Vector3(-1, 0, 0)
 		position2 -= Vector3(-1, 0, 0)
-#		print("a")
 		side = 0
 	else:
 		offset2 = Vector3(0, 0, 1)
@@ -112,7 +140,6 @@ func build_roof_side(item):
 		xloop = xsize * 0.5
 		position1 += Vector3(-1, -0.5, 1)
 		position2 -= Vector3(-1, 0.5, 1)
-#		print("b")
 		side = 1
 	for x in range(xloop):
 		pa1 += offset1
@@ -216,32 +243,7 @@ func build_roof_side(item):
 					queue.push_back(sx4)
 			pb1 += offset2
 			pb2 += offset2a
-#func make_room(item):
-#	var w = [
-#		{
-#			"name": "iwindow",
-#			"data": {
-#				"rotation": item.data.rotation,
-#				"position": item.data.position,
-#				"wing": item.data.wing,
-#				"room": item,
-#				"parent": item.data.anchor,
-#			}
-#		},
-#		{
-#			"name": "elastic_room",
-#			"data": {
-#				"rotation": item.data.rotation,
-#				"position": item.data.position,
-#				"wing": item.data.wing,
-#				"room": item,
-#				"parent": item.data.anchor,
-#			}
-#		}
-#	]
-#	for e in w:
-#		queue.push_back(e)
-#	item.data.wing.data.rooms.push_back(item)
+
 func build_roof(item):
 	var xsize = item.data.size.x
 	var ysize = item.data.size.y
@@ -333,6 +335,7 @@ func make_rooms(item: Dictionary, size: Vector2):
 		}
 	}
 	delayed_queue.push_back(xrooms)
+
 func check_valid_cut(item, aabb1, aabb2):
 	var ok = true
 	for e in item.data.wing.data.items:
@@ -347,6 +350,7 @@ func check_valid_cut(item, aabb1, aabb2):
 			elif e.name == "xdoor":
 				ok = false
 	return ok
+
 func split_room_data_x(item, cut):
 	var aabb = item.data.aabb
 	var offt1 = cut - aabb.position.x
@@ -516,46 +520,72 @@ func split_room_z(item):
 	else:
 		build_room(item)
 		
-func split_room(item):
-	print("split rooms")
-	var sz = item.data.size
-	if sz.x > sz.y && sz.x >= 8.0:
-		split_room_x(item)
-	elif sz.y >= 8.0:
-		split_room_z(item)
-	else:
-		build_room(item)
+func conv_item(item, conv):
+	var ret = {}
+	for e in conv.keys():
+		if item.name == e:
+			ret.name = conv[e].name
+			ret.data = {}
+			for d in conv[e].copy:
+				if item.data[d] is Dictionary || item.data[d] is Array:
+					ret.data[d] = item.data[d].duplicate()
+				else:
+					ret.data[d] = item.data[d]
+			break
+	return ret
 
 func build_room(item):
 	print("build rooms ", item.data.aabb)
+	var replace = {
+		"xwindow": {
+			"name": "iwindow",
+			"copy": ["position", "rotation", "wing"]
+		},
+		"xdoor": {
+			"name": "idoor",
+			"copy": ["position", "rotation", "wing"]
+		},
+		"xwall": {
+			"name": "iwall",
+			"copy": ["position", "rotation", "wing"]
+		},
+	}
 	var sz = item.data.size
 	var dim = Vector3(sz.x, 3.0, sz.y)
-#	var rooms_aabb = AABB(item.data.position - dim * 0.5, dim)
 	var rooms_aabb = item.data.aabb
 	for h in item.data.wing.data.items:
 		if rooms_aabb.has_point(h.data.position):
-			if h.name == "xwindow":
-				var w = {
-					"name": "iwindow",
-					"data": {
-						"position": h.data.position,
-						"rotation": h.data.rotation,
-						"wing": item.data.wing
-					}
-				}
-#							h.data.interior = w
-				queue.push_back(w)
-			elif h.name == "xdoor":
-				var w = {
-					"name": "idoor",
-					"data": {
-						"position": h.data.position,
-						"rotation": h.data.rotation,
-						"wing": item.data.wing
-					}
-				}
-				h.data.interior = w
-				queue.push_back(w)
+			var n = conv_item(h, replace)
+			if !n.empty():
+				queue.push_back(n)
+	var corners = [
+		{
+			"position": item.data.position + Vector3(float(0.0) - sz.x * 0.5, 0, float(0.0) - sz.y * 0.5),
+			"rotation": item.data.rotation + PI
+		},
+		{
+			"position": item.data.position + Vector3(float(item.data.size.x) - sz.x * 0.5, 0, float(item.data.size.y) - sz.y * 0.5),
+			"rotation": item.data.rotation
+		},
+		{
+			"position": item.data.position + Vector3(float(0.0) - sz.x * 0.5, 0, float(item.data.size.y) - sz.y * 0.5),
+			"rotation": item.data.rotation - PI * 0.5
+		},
+		{
+			"position": item.data.position + Vector3(float(item.data.size.x) - sz.x * 0.5, 0, float(0.0) - sz.y * 0.5),
+			"rotation": item.data.rotation + PI * 0.5
+		},
+	]
+	for c in corners:
+		var n = {
+		"name": "iangle",
+			"data": {
+				"position": c.position,
+				"rotation": c.rotation,
+				"wing": item.data.wing
+			}
+		}
+		queue.push_back(n)
 	for dx in range(0, item.data.size.x, 2):
 		for dy in range(0, item.data.size.y, 2):
 			var w = {
@@ -568,6 +598,19 @@ func build_room(item):
 			}
 			queue.push_back(w)
 
+func have_item(item, item_name):
+	var q = item.data.wing.data.house.data.bset.house_type
+	if items.has(q):
+		if items[q].has(item_name):
+			return true
+	return false
+func get_item(item, item_name):
+	var q = item.data.wing.data.house.data.bset.house_type
+	assert(items.has(q))
+	return items[q][item_name]
+func get_item_mesh(item, item_name):
+	return get_item(item, item_name).mesh
+
 func procedural(userdata):
 	var start = OS.get_ticks_msec()
 	if saved_seed == 0:
@@ -576,8 +619,8 @@ func procedural(userdata):
 	else:
 		rnd.seed = saved_seed
 	var wings = []
+#	var bset: BuildingSet = building_set
 	while queue.size() > 0 || delayed_queue.size() > 0:
-#		print(queue.size(), " ", delayed_queue.size())
 		if queue.size() == 0:
 			for e in delayed_queue:
 				if e.has("delay"):
@@ -592,17 +635,25 @@ func procedural(userdata):
 		if queue.size() == 0 && delayed_queue.size() > 0:
 			continue
 		var item = queue.pop_front()
-#		print(item.name)
 		match item.name:
 			"house":
-				var wing_count = 1 + rnd.randi() % 4
-#				wing_count = 4
+				var bset: BuildingSet = item.data.bset
+				var wcount = (bset.max_wings - bset.min_wings)
+				var wing_count = bset.min_wings
+				if wcount > 0:
+					wing_count += rnd.randi() % wcount
 				var pos = Vector3()
-#				var offset = Vector3()
 				var aabbs = []
-				var xsize = 4 + 4 * (rnd.randi() % 2)
-				var ysize = 4 + 4 * (rnd.randi() % 2)
+				var dxsize = bset.max_wing_size_x - bset.min_wing_size_x
+				var dzsize = bset.max_wing_size_z - bset.min_wing_size_z
+				var xsize = bset.min_wing_size_x
+				if dxsize > 0:
+					xsize += 4 * (rnd.randi() % (dxsize / 4))
+				var ysize = bset.min_wing_size_z
+				if dzsize > 0:
+					ysize += 4 * (rnd.randi() % (dzsize / 4))
 				var prev = null
+				var house_node = Spatial.new()
 				for _d in range(wing_count):
 					var aabb = AABB(pos - Vector3(xsize, 0, ysize) * 0.5, Vector3(xsize, 3, ysize))
 					var w = {
@@ -631,16 +682,16 @@ func procedural(userdata):
 					queue.push_back(w)
 					aabbs.push_back(aabb)
 					if aabbs.size() > 0:
-						var nxsize = 4 + 4 * (rnd.randi() % 3)
-						var nysize = 4 + 4 * (rnd.randi() % 3)
-#						var nxsize = 4 + 4 * (rnd.randi() % 3)
-#						print(xsize, " ", nxsize)
-#						var nysize = ysize + 0
+						var nxsize = bset.min_wing_size_x
+						if dxsize > 0:
+							nxsize += 4 * (rnd.randi() % (dxsize / 4))
+						var nysize = bset.min_wing_size_z
+						if dzsize > 0:
+							nysize += 4 * (rnd.randi() % (dzsize / 4))
 						pos = get_next_pos(pos, aabbs, xsize, ysize, nxsize, nysize)
 						xsize = nxsize
 						ysize = nysize
 					prev = w
-#				print(aabbs)
 			"wing":
 				var pos = [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(1, 0, 1), Vector3(-1, 0, 1)]
 				var rot = [-PI * 0.5, PI, PI * 0.5, 0]
@@ -754,7 +805,8 @@ func procedural(userdata):
 						l -= 1
 						pos += item.data.offset
 			"wall_or_window":
-				if rnd.randf() < pwindow:
+				var bset = item.data.wing.data.house.data.bset
+				if rnd.randf() < bset.pwindow:
 					item.name = "xwindow"
 					item.data.wing.data.windows.push_back(item)
 				else:
@@ -768,15 +820,15 @@ func procedural(userdata):
 				if roof_enabled:
 					build_roof_side(item)
 					build_roof(item)
+			"city":
+				build_city(item)
 			_:
-#				print("unknown item ", item.name)
-				if items.has(item.name):
-					item.data.mesh = items[item.name].mesh
+				if have_item(item, item.name):
+					item.data.mesh = get_item_mesh(item, item.name)
 					var xform = Transform().rotated(Vector3(0, 1, 0), item.data.rotation)
 					xform.origin = item.data.position
 					item.data.transform = xform
 					item.data.wing.data.items.push_back(item)
-#		print(queue.size(), " ", delayed_queue.size())
 
 	var finish = OS.get_ticks_msec() - start
 	print("elapsed: ", finish, "ms")
@@ -832,10 +884,10 @@ func procedural(userdata):
 			if need_wall:
 				if t.name == "xwindow":
 					t.name = "xwall"
-					t.data.mesh = items[t.name].mesh
+					t.data.mesh = get_item_mesh(t, t.name)
 				if x.name == "xwindow":
 					x.name = "xwall"
-					x.data.mesh = items[x.name].mesh
+					x.data.mesh = get_item_mesh(x, x.name)
 	var xa1 = []
 	var xa2 = []
 	for r in range(item_pairs_a.size()):
@@ -848,22 +900,19 @@ func procedural(userdata):
 			xa2.push_back(x)
 	finish = OS.get_ticks_msec() - start
 	print("elapsed1c: ", finish, "ms")
-#	print("exits ", xa1.size())
 	for r in range(xa1.size()):
 		var dp1 = xa1[r]
 		var dp2 = xa2[r]
-#		print(dp1 == dp2)
 		if exits.has(wings.find(dp1.data.wing)):
 			continue
 		if dp1.name == "xwall" && dp2.name == "xwall":
 			var p1 = dp1.data.position
 			var p2 = dp2.data.position
 			if can_pass(p1, p2):
-#				print("pass ", p1, " ", p2)
 				dp1.name = "xdoor"
-				dp1.data.mesh = items[dp1.name].mesh
+				dp1.data.mesh = get_item_mesh(dp1, dp1.name)
 				dp2.name = "xdoor"
-				dp2.data.mesh = items[dp2.name].mesh
+				dp2.data.mesh = get_item_mesh(dp2, dp2.name)
 				exits[wings.find(dp1.data.wing)] = [dp1, dp2]
 				exits[wings.find(dp2.data.wing)] = [dp2, dp1]
 				assert(dp1.data.has("wing"))
@@ -894,13 +943,12 @@ func procedural(userdata):
 		idx = idx1
 	var edoor = outer_items[idx]
 	edoor.name = "xdoor"
-	edoor.data.mesh = items[edoor.name].mesh
+	edoor.data.mesh = get_item_mesh(edoor, edoor.name)
 			
 	finish = OS.get_ticks_msec() - start
 	for e in wings:
 		make_rooms(e, e.data.size)
 	while queue.size() > 0 || delayed_queue.size() > 0:
-#		print(queue.size(), " ", delayed_queue.size())
 		if queue.size() == 0:
 			for e in delayed_queue:
 				if e.has("delay"):
@@ -915,32 +963,28 @@ func procedural(userdata):
 		if queue.size() == 0 && delayed_queue.size() > 0:
 			continue
 		var item = queue.pop_front()
-#		print(item.name)
 		match item.name:
-#			"rooms":
-#				make_rooms(item)
 			"rooms":
 				print("rooms")
 				var sz = item.data.size
-				var area = sz.x * sz.y
-#				if area > 24.0 && (sz.x >= 8.0 || sz.y >= 8.0):
-				if area > 24.0 && (sz.x >= 8.0):
-					split_room(item)
-				else:
-					build_room(item)
+				build_room(item)
 			_:
-#				print("unknown item ", item.name)
-				if items.has(item.name):
-					item.data.mesh = items[item.name].mesh
+				if have_item(item, item.name):
+					item.data.mesh = get_item_mesh(item, item.name)
 					var xform = Transform().rotated(Vector3(0, 1, 0), item.data.rotation)
 					xform.origin = item.data.position
 					item.data.transform = xform
 					item.data.wing.data.items.push_back(item)
 
 	for e in wings:
+		var house_node = Spatial.new()
+		var xform = Transform().rotated(Vector3(0, 1, 0), e.data.house.data.rotation)
+		xform.origin = e.data.house.data.position
+		house_node.transform = xform
 		for t in e.data.items:
 			var mi = MeshInstance.new()
 			mi.mesh = t.data.mesh
 			mi.transform = t.data.transform
-			call_deferred("add_child", mi)
+			house_node.add_child(mi)
+		call_deferred("add_child", house_node)
 	print("elapsed2: ", finish, "ms")

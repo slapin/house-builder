@@ -10,6 +10,21 @@ config_version=4
 
 _global_script_classes=[ {
 "base": "Resource",
+"class": "BuildingSet",
+"language": "GDScript",
+"path": "res://building_set.gd"
+}, {
+"base": "Spatial",
+"class": "CityParameters",
+"language": "GDScript",
+"path": "res://city.gd"
+}, {
+"base": "Resource",
+"class": "CitySet",
+"language": "GDScript",
+"path": "res://city_set.gd"
+}, {
+"base": "Resource",
 "class": "ExteriorSet",
 "language": "GDScript",
 "path": "res://exterior_set.gd"
@@ -20,6 +35,13 @@ _global_script_classes=[ {
 "path": "res://interior_set.gd"
 } ]
 _global_script_class_icons={
+"BuildingSet": "",
+"CityParameters": "",
+"CitySet": "",
 "ExteriorSet": "",
 "InteriorSet": ""
 }
+
+[editor_plugins]
+
+enabled=PoolStringArray( "res://addons/city_settings/plugin.cfg" )
