@@ -12,7 +12,8 @@ onready var queue = [
 		"data": {
 			"position": Vector3(),
 			"rotation": 0,
-			"set": city_set
+			"set": city_set,
+			"houses": []
 		}
 	},
 ]
@@ -22,42 +23,49 @@ var saved_seed = 0
 
 func build_city(item):
 	var cset: CitySet = item.data.set
-	var guildhall = {
-		"name": "house",
+	var center = {
+		"name": "center",
 		"data": {
 			"position": Vector3(),
 			"rotation": rnd.randf() * PI * 2.0,
-			"bset": cset.guildhall_building_set,
+			"town": item,
+			"set": item.data.set
 		}
 	}
-	queue.push_back(guildhall)
-	var circ = cset.radius * PI * 2.0
-	var count = circ / (cset.distance + 4.0)
+	queue.push_back(center)
+	var dcount = cset.max_buildings - cset.min_buildings
+	var count = cset.min_buildings
+	if dcount > 0:
+		count += rnd.randi() % dcount
+	print("count=", count)
 	var l = cset.building_sets.size()
 	if l == 0:
 		return
 	for e in range(count):
-		var r = cset.center_radius + rnd.randf() * (cset.radius - cset.center_radius)
-		var x = r * cos(e * cset.distance) + 4.0
-		var y = r * sin(e * cset.distance) + 4.0
 		var rot = rnd.randf() * PI * 2.0
+		var bset = cset.building_sets[rnd.randi() % l]
 		var house = {
 			"name": "house",
 			"data": {
-				"position": Vector3(x, 0, y),
+				"position": Vector3(),
 				"rotation": rnd.randf() * PI * 2.0,
-				"bset": cset.building_sets[rnd.randi() % l],
+				"bset": bset,
+				"type": bset.house_type,
+				"town": item,
+				"placement": "arc",
+				"aabb": AABB(),
 			}
 		}
 		queue.push_back(house)
+	print("city added")
 
-func get_next_pos(pos, aabbs, xsize, ysize, nxsize, nysize):
+func get_next_pos(pos, aabbs, xsize, ysize, nxsize, nysize, bset: BuildingSet):
 	var npos = pos
 	while true:
 		var s = rnd.randi() % 4
 		npos = pos
-		var dx = xsize * 0.5 + nxsize * 0.5 + 0.35
-		var dz = ysize * 0.5 + nysize * 0.5 + 0.35
+		var dx = xsize * 0.5 + nxsize * 0.5 + 0.35 + bset.wing_offset
+		var dz = ysize * 0.5 + nysize * 0.5 + 0.35 + bset.wing_offset
 		match s:
 			0:
 				npos += Vector3(dx, 0, 0)
@@ -92,13 +100,29 @@ var proc: Thread
 func _ready():
 	for e in city_set.items.keys():
 		items[e] = city_set.items[e].duplicate()
+	for e in items.keys():
+		for m in items[e].keys():
+			if items[e][m].has("mesh"):
+				var mesh: ArrayMesh = items[e][m].mesh
+				var surfaces = mesh.get_surface_count()
+				var mesh_arrays = []
+				var mesh_materials = []
+				for s in range(surfaces):
+					var surf = mesh.surface_get_arrays(s)
+					var mat = mesh.surface_get_material(s)
+					mesh_arrays.push_back(surf)
+					mesh_materials.push_back(mat)
+				if mesh_arrays.size() > 0:
+					items[e][m].mesh_arrays = mesh_arrays
+					items[e][m].mesh_materials = mesh_materials
+			
 	proc = Thread.new()
-	proc.start(self, "procedural", null)
-#	procedural(null)
+#	proc.start(self, "procedural", null)
+	procedural(null)
 
-func can_pass(p1, p2):
+func can_pass(p1, p2, offset):
 	if abs(p1.x - p2.x) < 0.01 || abs(p1.z - p2.z) < 0.01:
-		if abs(p1.x - p2.x) < 0.9 && abs(p1.z - p2.z) < 0.9:
+		if abs(p1.x - p2.x) < 0.9 + offset && abs(p1.z - p2.z) < 0.9 + offset:
 			return true
 	return false
 func build_roof_side(item):
@@ -355,7 +379,7 @@ func split_room_data_x(item, cut):
 	var aabb = item.data.aabb
 	var offt1 = cut - aabb.position.x
 	var offt2 = aabb.size.x - offt1
-	print("/", offt1, " ", offt2, " ", aabb.size.x, "/")
+#	print("/", offt1, " ", offt2, " ", aabb.size.x, "/")
 	var pos1 = aabb.position
 	var pos2 = Vector3(cut, aabb.position.y, aabb.position.z)
 	var sz1 = Vector2(offt1, aabb.size.z)
@@ -390,7 +414,7 @@ func split_room_data_z(item, cut):
 	var aabb = item.data.aabb
 	var offt1 = cut - aabb.position.z
 	var offt2 = aabb.size.z - offt1
-	print("/", offt1, " ", offt2, " ", aabb.size.z, "/")
+#	print("/", offt1, " ", offt2, " ", aabb.size.z, "/")
 	var pos1 = aabb.position
 	var pos2 = aabb.position
 	pos2.z = cut
@@ -504,7 +528,7 @@ func split_room_x(item):
 	var matching = result[0]
 	var cut = result[1]
 	if matching:
-		print("matching: ", cut)
+#		print("matching: ", cut)
 		split_room_data_x(item, cut)
 	else:
 		build_room(item)
@@ -515,7 +539,7 @@ func split_room_z(item):
 	var matching = result[0]
 	var cut = result[1]
 	if matching:
-		print("matching: ", cut)
+#		print("matching: ", cut)
 		split_room_data_z(item, cut)
 	else:
 		build_room(item)
@@ -535,7 +559,7 @@ func conv_item(item, conv):
 	return ret
 
 func build_room(item):
-	print("build rooms ", item.data.aabb)
+#	print("build rooms ", item.data.aabb)
 	var replace = {
 		"xwindow": {
 			"name": "iwindow",
@@ -597,6 +621,15 @@ func build_room(item):
 				}
 			}
 			queue.push_back(w)
+			var c = {
+				"name": "ceiling",
+				"data": {
+					"position": item.data.position + Vector3(float(dx) + 1.0 - sz.x * 0.5, 0, float(dy) + 1.0 - sz.y * 0.5),
+					"rotation": item.data.rotation,
+					"wing": item.data.wing
+				}
+			}
+			queue.push_back(c)
 
 func have_item(item, item_name):
 	var q = item.data.wing.data.house.data.bset.house_type
@@ -610,6 +643,64 @@ func get_item(item, item_name):
 	return items[q][item_name]
 func get_item_mesh(item, item_name):
 	return get_item(item, item_name).mesh
+
+func init_join(join: Array):
+	join.resize(ArrayMesh.ARRAY_MAX)
+	for id in range(ArrayMesh.ARRAY_MAX):
+		match id:
+			ArrayMesh.ARRAY_INDEX:
+				join[id] = PoolIntArray()
+			ArrayMesh.ARRAY_VERTEX:
+				join[id] = PoolVector3Array()
+			ArrayMesh.ARRAY_NORMAL:
+				join[id] = PoolVector3Array()
+			ArrayMesh.ARRAY_TEX_UV:
+				join[id] = PoolVector2Array()
+
+func merge_meshes(join: Array, surfaces: Array, xforms: Array):
+	var index_offset = 0
+	var vertex_offset = 0
+	join.resize(ArrayMesh.ARRAY_MAX)
+	var xfidx = 0
+	for st in surfaces:
+		var s = st[0]
+		var icount = join[ArrayMesh.ARRAY_INDEX].size()
+		var count = join[ArrayMesh.ARRAY_VERTEX].size()
+		var xform = xforms[xfidx]
+		for id in range(ArrayMesh.ARRAY_MAX):
+			match id:
+				ArrayMesh.ARRAY_INDEX:
+					var data_index1 = Array(join[id] + s[id])
+#					var data_index2 = Array(s[id])
+#					var icount = data_index1.size()
+					print("count: ", count)
+#					data_index1.resize(data_index1.size() + data_index2.size())
+					for e in range(s[id].size()):
+						data_index1[e + icount] = s[id][e] + count
+					join[id] = PoolIntArray(data_index1)
+					print("final count: ", join[id].size())
+				ArrayMesh.ARRAY_VERTEX:
+					var data_vertex1 = Array(join[id])
+					var data_vertex2 = Array(s[id])
+					data_vertex1.resize(join[id].size() + s[id].size())
+					for e in range(s[id].size()):
+						var g = data_vertex2[e]
+						var d = xform.xform(g)
+						data_vertex1[e + count] = d
+					join[id] = PoolVector3Array(data_vertex1)
+				ArrayMesh.ARRAY_NORMAL:
+					var data_normal1 = Array(join[id])
+					var data_normal2 = Array(s[id])
+					for e in range(data_normal2.size()):
+						data_normal2[e] = xform.basis.xform(data_normal2[e])
+					data_normal1 = data_normal1 + data_normal2
+					join[id] = PoolVector3Array(data_normal1)
+				ArrayMesh.ARRAY_TEX_UV:
+					var data_uv1 = Array(join[id])
+					var data_uv2 = Array(s[id])
+					join[id] = PoolVector2Array(data_uv1 + data_uv2)
+		xfidx += 1
+	
 
 func procedural(userdata):
 	var start = OS.get_ticks_msec()
@@ -636,7 +727,57 @@ func procedural(userdata):
 			continue
 		var item = queue.pop_front()
 		match item.name:
+			"center":
+				var guild = {
+					"name": "guildhouse",
+					"data": {
+						"set": item.data.set,
+						"position": Vector3(),
+						"rotation": rnd.randf() * PI * 2.0,
+						"town": item.data.town,
+					}
+				}
+				queue.push_back(guild)
+				var court = {
+					"name": "courthouse",
+					"data": {
+						"set": item.data.set,
+						"position": Vector3(),
+						"rotation": rnd.randf() * PI * 2.0,
+						"town": item.data.town,
+					}
+				}
+				queue.push_back(court)
+			"guildhouse":
+				var guildhall = {
+					"name": "house",
+					"data": {
+						"position": Vector3(),
+						"rotation": rnd.randf() * PI * 2.0,
+						"bset": item.data.set.guildhall_building_set,
+						"town": item.data.town,
+						"type": item.data.set.guildhall_building_set.house_type,
+						"placement": "center",
+						"aabb": AABB(),
+					}
+				}
+				queue.push_back(guildhall)
+			"courthouse":
+				var courthouse = {
+					"name": "house",
+					"data": {
+						"position": Vector3(),
+						"rotation": rnd.randf() * PI * 2.0,
+						"bset": city_set.guildhall_building_set,
+						"town": item,
+						"type": city_set.guildhall_building_set.house_type,
+						"placement": "center",
+						"aabb": AABB(),
+					}
+				}
+				queue.push_back(courthouse)
 			"house":
+#				print(item.name)
 				item.data.wings = []
 				houses.push_back(item)
 				var bset: BuildingSet = item.data.bset
@@ -644,6 +785,7 @@ func procedural(userdata):
 				var wing_count = bset.min_wings
 				if wcount > 0:
 					wing_count += rnd.randi() % wcount
+#				print("wings count:", wcount)
 				var pos = Vector3()
 				var aabbs = []
 				var dxsize = bset.max_wing_size_x - bset.min_wing_size_x
@@ -676,6 +818,7 @@ func procedural(userdata):
 							"rooms": [],
 						},
 					}
+					item.data.aabb = item.data.aabb.merge(aabb)
 					if !prev:
 						w.data.entry = true
 					else:
@@ -691,11 +834,13 @@ func procedural(userdata):
 						var nysize = bset.min_wing_size_z
 						if dzsize > 0:
 							nysize += 4 * (rnd.randi() % (dzsize / 4))
-						pos = get_next_pos(pos, aabbs, xsize, ysize, nxsize, nysize)
+						pos = get_next_pos(pos, aabbs, xsize, ysize, nxsize, nysize, item.data.bset)
 						xsize = nxsize
 						ysize = nysize
 					prev = w
+#					print("added wing")
 			"wing":
+				print(item.name)
 				var pos = [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(1, 0, 1), Vector3(-1, 0, 1)]
 				var rot = [-PI * 0.5, PI, PI * 0.5, 0]
 				var l = [item.data.size.x, item.data.size.y, item.data.size.x, item.data.size.y]
@@ -818,7 +963,7 @@ func procedural(userdata):
 				assert(item.data.wing.data.has("facades"))
 				queue.push_back(item)
 			"roof":
-				print("roof")
+#				print("roof")
 				if roof_enabled:
 					build_roof_side(item)
 					build_roof(item)
@@ -827,6 +972,7 @@ func procedural(userdata):
 			_:
 				if have_item(item, item.name):
 					item.data.mesh = get_item_mesh(item, item.name)
+					item.data.mesh_arrays = get_item(item, item.name).mesh_arrays
 					var xform = Transform().rotated(Vector3(0, 1, 0), item.data.rotation)
 					xform.origin = item.data.position
 					item.data.transform = xform
@@ -904,7 +1050,8 @@ func procedural(userdata):
 			if dp1.name == "xwall" && dp2.name == "xwall":
 				var p1 = dp1.data.position
 				var p2 = dp2.data.position
-				if can_pass(p1, p2):
+				var offset = h.data.bset.wing_offset
+				if can_pass(p1, p2, offset):
 					dp1.name = "xdoor"
 					dp1.data.mesh = get_item_mesh(dp1, dp1.name)
 					dp2.name = "xdoor"
@@ -942,7 +1089,6 @@ func procedural(userdata):
 		edoor.name = "xdoor"
 		edoor.data.mesh = get_item_mesh(edoor, edoor.name)
 			
-	finish = OS.get_ticks_msec() - start
 	for h in houses:
 		for e in h.data.wings:
 			make_rooms(e, e.data.size)
@@ -969,21 +1115,92 @@ func procedural(userdata):
 			_:
 				if have_item(item, item.name):
 					item.data.mesh = get_item_mesh(item, item.name)
+					item.data.mesh_arrays = get_item(item, item.name).mesh_arrays
 					var xform = Transform().rotated(Vector3(0, 1, 0), item.data.rotation)
 					xform.origin = item.data.position
 					item.data.transform = xform
 					item.data.wing.data.items.push_back(item)
 
+	var rd = city_set.radius
+	var circ = rd * 2.0 * PI
+	var ang = 0.0
+	var loops = 0
+	var max_radius = 0
+	var center_pos = Vector3()
+	var center_ang = 0.0
+	var center_rd = 0.0
+	var center_max_radius = 0
+	var center_circ = center_rd * 2.0 * PI
+	for h in houses:
+		if h.data.placement == "center":
+			h.data.position = center_pos
+			var house_sz = h.data.aabb.size
+			var house_radius = max(house_sz.x, house_sz.z)
+			if center_max_radius < house_radius:
+				center_max_radius = house_radius
+			if center_circ <= 0.0:
+				center_rd += center_max_radius * 1.5
+				center_circ = center_rd * 2.0 * PI
+			var da = house_radius * 2.0 / center_circ * 2.0 * PI
+			center_ang += da
+			if center_ang > PI * 2.0:
+				center_ang -= PI * 2.0
+				center_rd += center_max_radius * 2.0
+				center_circ = center_rd * 2.0 * PI
+			center_pos.x = center_rd * cos(center_ang)
+			center_pos.z = center_rd * sin(center_ang)
+		elif h.data.placement == "arc":
+			var house_sz = h.data.aabb.size
+			var house_radius = max(house_sz.x, house_sz.z)
+			if max_radius < house_radius:
+				max_radius = house_radius
+			var da = house_radius * 2.0 / circ * 2.0 * PI
+			h.data.position.x = rd * cos(ang)
+			h.data.position.z = rd * sin(ang)
+			ang += da
+			if ang > PI * 2.0:
+				ang -= PI
+				loops += 1
+				rd += max_radius * 2.0
+				circ = rd * 2.0 * PI
 	for h in houses:
 		var house_node = Spatial.new()
 		var xform = Transform().rotated(Vector3(0, 1, 0), h.data.rotation)
 		xform.origin = h.data.position
 		house_node.transform = xform
+		var house_s = []
+		init_join(house_s)
+		var surf = []
+		var xforms = []
+		var mat
+		var count = 0
+		print("starting merge")
 		for e in h.data.wings:
 			for t in e.data.items:
-				var mi = MeshInstance.new()
-				mi.mesh = t.data.mesh
-				mi.transform = t.data.transform
-				house_node.add_child(mi)
+				if !t.name == "xdoor":
+					if !mat:
+						mat = t.data.mesh.surface_get_material(0)
+					assert(t.data.has("mesh_arrays"))
+					surf.push_back(t.data.mesh_arrays)
+					xforms.push_back(t.data.transform)
+					count += 1
+				else:
+#				print("m ", count)
+					var mi = MeshInstance.new()
+					mi.mesh = t.data.mesh
+					mi.transform = t.data.transform
+					house_node.add_child(mi)
+					mi.create_trimesh_collision()
+		print("surf: ", surf.size())
+		merge_meshes(house_s, surf, xforms)
+		print("merged")
+		var new_mesh: ArrayMesh = ArrayMesh.new()
+		new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, house_s)
+		new_mesh.surface_set_material(0, mat)
+		var mi = MeshInstance.new()
+		mi.mesh = new_mesh
+		mi.create_trimesh_collision()
+		house_node.add_child(mi)
 		call_deferred("add_child", house_node)
+	finish = OS.get_ticks_msec() - start
 	print("elapsed2: ", finish, "ms")

@@ -1,15 +1,17 @@
-[gd_resource type="Resource" load_steps=6 format=2]
+[gd_resource type="Resource" load_steps=7 format=2]
 
 [ext_resource path="res://city_set.gd" type="Script" id=1]
-[ext_resource path="res://sets/building1.tres" type="Resource" id=2]
+[ext_resource path="res://sets/building_guild.tres" type="Resource" id=2]
 [ext_resource path="res://sets/building3.tres" type="Resource" id=3]
 [ext_resource path="res://sets/building2.tres" type="Resource" id=4]
 [ext_resource path="res://sets/building4.tres" type="Resource" id=5]
+[ext_resource path="res://sets/building1.tres" type="Resource" id=6]
 
 [resource]
 script = ExtResource( 1 )
 guildhall_building_set = ExtResource( 2 )
-building_sets = [ ExtResource( 4 ), ExtResource( 3 ), ExtResource( 5 ) ]
-center_radius = 100.0
-radius = 200
-distance = 100.0
+building_sets = [ ExtResource( 4 ), ExtResource( 3 ), ExtResource( 5 ), ExtResource( 6 ) ]
+center_radius = 50.0
+radius = 80
+max_buildings = 15
+min_buildings = 10

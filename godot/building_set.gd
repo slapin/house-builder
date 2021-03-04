@@ -13,6 +13,8 @@ export var pwindow: float = 0.6
 export var pmidwall: float = 0.2
 export var exterior_set: Resource
 export var interior_set: Resource
+export var furniture_set: Resource
+export var wing_offset: float = 0.0
 
 func get_items():
 	var items = {}
@@ -20,5 +22,8 @@ func get_items():
 		items[e] = exterior_set.items[e].duplicate()
 	for e in interior_set.items.keys():
 		items[e] = interior_set.items[e].duplicate()
+	if furniture_set:
+		for e in furniture_set.items.keys():
+			items[e] = furniture_set.items[e].duplicate()
 	return items
 var items = {} setget , get_items

@@ -6,7 +6,8 @@ export var guildhall_building_set: Resource
 export(Array, Resource) var building_sets = []
 export var center_radius: float = 100.0
 export var radius: int = 1000
-export var distance = 50.0
+export var max_buildings = 10
+export var min_buildings = 15
 
 func get_items():
 	var items = {}

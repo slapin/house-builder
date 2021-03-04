@@ -17,3 +17,4 @@ pwindow = 0.6
 pmidwall = 0.2
 exterior_set = ExtResource( 3 )
 interior_set = ExtResource( 2 )
+wing_offset = 0.0
