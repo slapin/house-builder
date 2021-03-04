@@ -7,12 +7,12 @@
 [resource]
 script = ExtResource( 1 )
 house_type = "house1"
-min_wings = 6
-max_wings = 9
+min_wings = 2
+max_wings = 4
 min_wing_size_x = 8
 min_wing_size_z = 8
-max_wing_size_x = 24
-max_wing_size_z = 24
+max_wing_size_x = 16
+max_wing_size_z = 16
 pwindow = 0.6
 pmidwall = 0.2
 exterior_set = ExtResource( 3 )

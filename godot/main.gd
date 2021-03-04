@@ -618,7 +618,7 @@ func procedural(userdata):
 		saved_seed = rnd.seed
 	else:
 		rnd.seed = saved_seed
-	var wings = []
+	var houses = []
 #	var bset: BuildingSet = building_set
 	while queue.size() > 0 || delayed_queue.size() > 0:
 		if queue.size() == 0:
@@ -637,6 +637,8 @@ func procedural(userdata):
 		var item = queue.pop_front()
 		match item.name:
 			"house":
+				item.data.wings = []
+				houses.push_back(item)
 				var bset: BuildingSet = item.data.bset
 				var wcount = (bset.max_wings - bset.min_wings)
 				var wing_count = bset.min_wings
@@ -681,6 +683,7 @@ func procedural(userdata):
 						w.data.adj.push_back(prev)
 					queue.push_back(w)
 					aabbs.push_back(aabb)
+					item.data.wings.push_back(w)
 					if aabbs.size() > 0:
 						var nxsize = bset.min_wing_size_x
 						if dxsize > 0:
@@ -697,7 +700,6 @@ func procedural(userdata):
 				var rot = [-PI * 0.5, PI, PI * 0.5, 0]
 				var l = [item.data.size.x, item.data.size.y, item.data.size.x, item.data.size.y]
 				var o = [Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0), Vector3(0, 0, -1)]
-				wings.push_back(item)
 				for p in range(pos.size()):
 					var x = {
 						"name": "xangle",
@@ -832,122 +834,118 @@ func procedural(userdata):
 
 	var finish = OS.get_ticks_msec() - start
 	print("elapsed: ", finish, "ms")
-	if wings.size() == 0:
+	if houses.size() == 0:
 		return
-	var entry = wings[0]
-	var exits = {}
-	var adj_pairs = []
-	var item_pairs_a = []
-	var item_pairs_b = []
-	var uniq_a = []
-	var uniq_b = []
-	for e in wings:
-		for adj in e.data.adj:
-			if e == adj:
-				continue
-			adj_pairs.push_back([e, adj])
-	finish = OS.get_ticks_msec() - start
-	print("elapsed1a: ", finish, "ms")
-	var elegible = ["xwindow", "xwall"]
-	for r in adj_pairs:
-		var e = r[0]
-		var ew = r[1]
-		for t in e.data.items:
-			for x in ew.data.items:
+	for h in houses:
+		var entry = h.data.wings[0]
+		var exits = {}
+		var adj_pairs = []
+		var item_pairs_a = []
+		var item_pairs_b = []
+		var uniq_a = []
+		var uniq_b = []
+		for e in h.data.wings:
+			for adj in e.data.adj:
+				if e == adj:
+					continue
+				adj_pairs.push_back([e, adj])
+		var elegible = ["xwindow", "xwall"]
+		for r in adj_pairs:
+			var e = r[0]
+			var ew = r[1]
+			for t in e.data.items:
+				for x in ew.data.items:
+					if t == x:
+						continue
+					if t.name in elegible && x.name in elegible:
+						item_pairs_a.push_back(t)
+						item_pairs_b.push_back(x)
+						if !t in uniq_a:
+							uniq_a.push_back(t)
+						if !x in uniq_b:
+							uniq_b.push_back(x)
+		for t in uniq_a:
+			for x in uniq_b:
 				if t == x:
 					continue
-				if t.name in elegible && x.name in elegible:
-#					if !(t in item_pairs_a && x in item_pairs_b):
-					item_pairs_a.push_back(t)
-					item_pairs_b.push_back(x)
-					if !t in uniq_a:
-						uniq_a.push_back(t)
-					if !x in uniq_b:
-						uniq_b.push_back(x)
-	finish = OS.get_ticks_msec() - start
-	print("elapsed1b: ", finish, "ms")
-	for t in uniq_a:
-		for x in uniq_b:
-			if t == x:
-				continue
+				var p1 = t.data.position
+				var p2 = x.data.position
+				var need_wall = false
+				if abs(p1.x - p2.x) <= 1.0 && abs(p1.z - p2.z) < 0.45:
+					need_wall = true
+				if abs(p1.x - p2.x) < 0.45 && abs(p1.z - p2.z) <= 1.0:
+					need_wall = true
+				if abs(p1.x - p2.x) <= 3.0 && abs(p1.z - p2.z) < 0.45 && abs(p1.z - p2.z) > 0.1:
+					need_wall = true
+				if abs(p1.z - p2.z) <= 3.0 && abs(p1.x - p2.x) < 0.45 && abs(p1.x - p2.x) > 0.1:
+					need_wall = true
+				if need_wall:
+					if t.name == "xwindow":
+						t.name = "xwall"
+						t.data.mesh = get_item_mesh(t, t.name)
+					if x.name == "xwindow":
+						x.name = "xwall"
+						x.data.mesh = get_item_mesh(x, x.name)
+		var xa1 = []
+		var xa2 = []
+		for r in range(item_pairs_a.size()):
+			var t = item_pairs_a[r]
+			var x = item_pairs_b[r]
 			var p1 = t.data.position
 			var p2 = x.data.position
-			var need_wall = false
-			if abs(p1.x - p2.x) <= 1.0 && abs(p1.z - p2.z) < 0.45:
-				need_wall = true
-			if abs(p1.x - p2.x) < 0.45 && abs(p1.z - p2.z) <= 1.0:
-				need_wall = true
-			if abs(p1.x - p2.x) <= 3.0 && abs(p1.z - p2.z) < 0.45 && abs(p1.z - p2.z) > 0.1:
-				need_wall = true
-			if abs(p1.z - p2.z) <= 3.0 && abs(p1.x - p2.x) < 0.45 && abs(p1.x - p2.x) > 0.1:
-				need_wall = true
-			if need_wall:
-				if t.name == "xwindow":
-					t.name = "xwall"
-					t.data.mesh = get_item_mesh(t, t.name)
-				if x.name == "xwindow":
-					x.name = "xwall"
-					x.data.mesh = get_item_mesh(x, x.name)
-	var xa1 = []
-	var xa2 = []
-	for r in range(item_pairs_a.size()):
-		var t = item_pairs_a[r]
-		var x = item_pairs_b[r]
-		var p1 = t.data.position
-		var p2 = x.data.position
-		if abs(p1.x - p2.x) < 10.0 || abs(p1.z - p2.z) < 10.0:
-			xa1.push_back(t)
-			xa2.push_back(x)
-	finish = OS.get_ticks_msec() - start
-	print("elapsed1c: ", finish, "ms")
-	for r in range(xa1.size()):
-		var dp1 = xa1[r]
-		var dp2 = xa2[r]
-		if exits.has(wings.find(dp1.data.wing)):
-			continue
-		if dp1.name == "xwall" && dp2.name == "xwall":
-			var p1 = dp1.data.position
-			var p2 = dp2.data.position
-			if can_pass(p1, p2):
-				dp1.name = "xdoor"
-				dp1.data.mesh = get_item_mesh(dp1, dp1.name)
-				dp2.name = "xdoor"
-				dp2.data.mesh = get_item_mesh(dp2, dp2.name)
-				exits[wings.find(dp1.data.wing)] = [dp1, dp2]
-				exits[wings.find(dp2.data.wing)] = [dp2, dp1]
-				assert(dp1.data.has("wing"))
-				assert(dp1.data.wing.data.has("facades"))
-				dp1.data.wing.data.facades_internal[dp1.data.wing.data.facades.find(dp1.data.facade)] = true
-				dp2.data.wing.data.facades_internal[dp2.data.wing.data.facades.find(dp2.data.facade)] = true
+			if abs(p1.x - p2.x) < 10.0 || abs(p1.z - p2.z) < 10.0:
+				xa1.push_back(t)
+				xa2.push_back(x)
+		for r in range(xa1.size()):
+			var dp1 = xa1[r]
+			var dp2 = xa2[r]
+			if exits.has(h.data.wings.find(dp1.data.wing)):
+				continue
+			if dp1.name == "xwall" && dp2.name == "xwall":
+				var p1 = dp1.data.position
+				var p2 = dp2.data.position
+				if can_pass(p1, p2):
+					dp1.name = "xdoor"
+					dp1.data.mesh = get_item_mesh(dp1, dp1.name)
+					dp2.name = "xdoor"
+					dp2.data.mesh = get_item_mesh(dp2, dp2.name)
+					exits[h.data.wings.find(dp1.data.wing)] = [dp1, dp2]
+					exits[h.data.wings.find(dp2.data.wing)] = [dp2, dp1]
+					assert(dp1.data.has("wing"))
+					assert(dp1.data.wing.data.has("facades"))
+					dp1.data.wing.data.facades_internal[dp1.data.wing.data.facades.find(dp1.data.facade)] = true
+					dp2.data.wing.data.facades_internal[dp2.data.wing.data.facades.find(dp2.data.facade)] = true
 	finish = OS.get_ticks_msec() - start
 	print("elapsed1d: ", finish, "ms")
 
-	var outer_items = []
-	for e in wings:
-		for f in e.data.facades:
-			if !e.data.facades_internal[e.data.facades.find(f)]:
-				for m in f.data.items:
-					if m.name in ["xwall", "xwindow"]:
-						outer_items.push_back(m)
-	var idx1 = rnd.randi() % outer_items.size()
-	var idx2 = rnd.randi() % outer_items.size()
-	var idx3 = rnd.randi() % outer_items.size()
-	var idx4 = rnd.randi() % outer_items.size()
-	var idx5 = rnd.randi() % outer_items.size()
-	var idx = -1
-	for xid in [idx1, idx2, idx3, idx4, idx5]:
-		if outer_items[xid].name == "xwall":
-			idx = xid
-			break
-	if idx < 0:
-		idx = idx1
-	var edoor = outer_items[idx]
-	edoor.name = "xdoor"
-	edoor.data.mesh = get_item_mesh(edoor, edoor.name)
+	for h in houses:
+		var outer_items = []
+		for e in h.data.wings:
+			for f in e.data.facades:
+				if !e.data.facades_internal[e.data.facades.find(f)]:
+					for m in f.data.items:
+						if m.name in ["xwall", "xwindow"]:
+							outer_items.push_back(m)
+		var idx1 = rnd.randi() % outer_items.size()
+		var idx2 = rnd.randi() % outer_items.size()
+		var idx3 = rnd.randi() % outer_items.size()
+		var idx4 = rnd.randi() % outer_items.size()
+		var idx5 = rnd.randi() % outer_items.size()
+		var idx = -1
+		for xid in [idx1, idx2, idx3, idx4, idx5]:
+			if outer_items[xid].name == "xwall":
+				idx = xid
+				break
+		if idx < 0:
+			idx = idx1
+		var edoor = outer_items[idx]
+		edoor.name = "xdoor"
+		edoor.data.mesh = get_item_mesh(edoor, edoor.name)
 			
 	finish = OS.get_ticks_msec() - start
-	for e in wings:
-		make_rooms(e, e.data.size)
+	for h in houses:
+		for e in h.data.wings:
+			make_rooms(e, e.data.size)
 	while queue.size() > 0 || delayed_queue.size() > 0:
 		if queue.size() == 0:
 			for e in delayed_queue:
@@ -976,15 +974,16 @@ func procedural(userdata):
 					item.data.transform = xform
 					item.data.wing.data.items.push_back(item)
 
-	for e in wings:
+	for h in houses:
 		var house_node = Spatial.new()
-		var xform = Transform().rotated(Vector3(0, 1, 0), e.data.house.data.rotation)
-		xform.origin = e.data.house.data.position
+		var xform = Transform().rotated(Vector3(0, 1, 0), h.data.rotation)
+		xform.origin = h.data.position
 		house_node.transform = xform
-		for t in e.data.items:
-			var mi = MeshInstance.new()
-			mi.mesh = t.data.mesh
-			mi.transform = t.data.transform
-			house_node.add_child(mi)
+		for e in h.data.wings:
+			for t in e.data.items:
+				var mi = MeshInstance.new()
+				mi.mesh = t.data.mesh
+				mi.transform = t.data.transform
+				house_node.add_child(mi)
 		call_deferred("add_child", house_node)
 	print("elapsed2: ", finish, "ms")
